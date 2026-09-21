@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Research Sentinel</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-block">
+      <div class="brand-mark" aria-hidden="true">M</div>
+      <div>
+        <h1>Research Sentinel</h1>
+        <p id="projectPath">CELL-IRS</p>
+      </div>
+    </div>
+    <nav class="view-nav" aria-label="监控视图">
+      <button class="nav-item active" type="button" data-view="overview">概览</button>
+      <button class="nav-item" type="button" data-view="processes">进程 <span id="processBadge">0</span></button>
+      <button class="nav-item" type="button" data-view="settings">设置</button>
+    </nav>
+    <div class="top-actions">
+      <button id="rescanButton" class="button secondary" type="button">重新扫描</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="statusBand" class="status-band" aria-live="polite">
+      <div>
+        <span id="statusDot" class="status-dot"></span>
+        <strong id="statusLabel">连接中</strong>
+        <span id="statusMessage">正在读取监控服务</span>
+      </div>
+      <div class="status-side"><span id="platformLabel">--</span><time id="updatedAt">--</time></div>
+    </section>
+
+    <section id="view-overview" class="app-view active" aria-label="任务概览">
+      <section class="metrics" aria-label="运行摘要">
+        <article class="metric">
+          <span class="metric-label">总进度</span>
+          <strong id="progressPercent">--</strong>
+          <span id="progressCount" class="metric-detail">-- / --</span>
+        </article>
+        <article class="metric">
+          <span class="metric-label">CPU</span>
+          <strong id="cpuValue">--</strong>
+          <span class="metric-detail">任务合计</span>
+        </article>
+        <article class="metric">
+          <span class="metric-label">内存</span>
+          <strong id="memoryValue">--</strong>
+          <span id="processCount" class="metric-detail">0 个进程</span>
+        </article>
+        <article class="metric">
+          <span class="metric-label">预计剩余</span>
+          <strong id="etaValue">--</strong>
+          <span id="itemTime" class="metric-detail">单点耗时 --</span>
+        </article>
+      </section>
+
+      <section class="progress-section">
+        <div class="section-heading">
+          <div><h2>任务进度</h2><p id="jobDirectory">尚未发现任务目录</p></div>
+          <span id="trialValue" class="compact-value">轮次 --</span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div class="progress-meta"><span id="latestLine">暂无进度输出</span><span id="activityAge">最近活动 --</span></div>
+      </section>
+
+      <section class="workspace-grid">
+        <div class="panel chart-panel">
+          <div class="section-heading">
+            <div><h2>资源活动</h2><p>最近 10 分钟</p></div>
+            <span class="legend"><i></i>CPU</span>
+          </div>
+          <canvas id="activityChart" height="220" aria-label="MATLAB CPU 历史曲线"></canvas>
+        </div>
+        <div class="panel recovery-panel">
+          <div class="section-heading">
+            <div><h2>恢复状态</h2><p id="recoveryMessage">等待捕获启动命令</p></div>
+            <span id="recoveryAttempts" class="compact-value">0 / 5</span>
+          </div>
+          <dl class="details-list">
+            <div><dt>运行平台</dt><dd id="platformSupport">--</dd></div>
+            <div><dt>恢复命令</dt><dd id="commandState">未捕获</dd></div>
+            <div><dt>下次尝试</dt><dd id="nextRestart">--</dd></div>
+            <div><dt>工作目录</dt><dd id="recoveryCwd">--</dd></div>
+            <div><dt>恢复日志</dt><dd id="restartLog">--</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="artifact-strip">
+        <div><span>Checkpoint</span><strong id="checkpointName">--</strong><small id="checkpointAge">--</small></div>
+        <div><span>错误输出</span><strong id="stderrState">--</strong><small id="stderrPath">--</small></div>
+      </section>
+    </section>
+
+    <section id="view-processes" class="app-view" aria-label="MATLAB 进程">
+      <div class="page-heading">
+        <div><h2>科研任务</h2><p id="processSummary">等待进程</p></div>
+        <span id="processCpuSummary" class="compact-value">CPU --</span>
+      </div>
+      <div id="processGrid" class="process-grid"><p class="empty-state">暂无进程</p></div>
+    </section>
+    <section id="view-settings" class="app-view" aria-label="设置">
+      <div class="page-heading"><h2>服务设置</h2><span id="settingsPlatform" class="compact-value"></span></div>
+      <form id="settingsForm" class="settings-form">
+        <label>刷新间隔（秒）<input name="refresh_seconds" type="number" min="1" max="60" required></label>
+        <label>结束任务保留（小时）<input name="retention_hours" type="number" min="1" max="168" required></label>
+        <label>首次续跑等待（秒）<input name="restart_delay_seconds" type="number" min="5" max="300" required></label>
+        <label>最多续跑次数<input name="max_restart_attempts" type="number" min="0" max="20" required></label>
+        <label>内存保护阈值（%）<input name="memory_limit_percent" type="number" min="50" max="99" required></label>
+        <label>最低可用内存（MB）<input name="memory_min_mb" type="number" min="128" max="32768" required></label>
+        <label class="setting-check"><input name="autostart" type="checkbox">开机自启（用户登录后）</label>
+        <label class="setting-check"><input name="lan_enabled" type="checkbox">允许局域网 / Tailscale 访问</label>
+        <p id="autostartState"></p>
+        <p id="memoryState" role="status"></p>
+        <div><button class="button secondary" type="submit">保存设置</button><span id="settingsFeedback" role="status"></span></div>
+      </form>
+      <section class="settings-help">
+        <h2>部署与权限</h2>
+        <details><summary>自启动：Windows / macOS / Linux</summary>
+          <p>Windows：写入当前用户的启动文件夹，下次登录后运行。若提示权限不足，可在任务计划程序中创建“登录时”任务，以当前用户运行 Python 和本服务，不需要最高权限。</p>
+          <p>macOS（Intel / Apple Silicon）：写入 ~/Library/LaunchAgents/org.research.monitor.plist，下次登录加载。在系统设置 → 通用 → 登录项中允许后台运行；若被系统阻止，请手动批准。</p>
+          <p>Linux：创建并启用 systemd 用户服务 research-sentinel.service。无图形登录时自动启动，需要管理员运行 loginctl enable-linger 用户名。没有 systemd 的系统请由管理员使用现有服务管理器运行下方命令。</p>
+          <p>自启动运行命令：</p><pre id="startupCommand"></pre>
+        </details>
+        <details><summary>网络访问与防火墙</summary>
+          <p>开启后监听全部 IPv4 网卡；关闭后仅监听 127.0.0.1。关闭时远程页面会断开，本机页面不受影响。此服务没有账号认证，只应开放给可信设备。</p>
+          <p>Windows：高级防火墙 → 入站规则 → 新建端口规则 → TCP，下方显示的服务端口；将来源限制为你的局域网网段或指定 Tailscale 设备。</p>
+          <p>Linux：由管理员在 ufw / firewalld 中仅放行可信来源到服务端口。macOS：系统设置 → 网络 → 防火墙 → 选项，允许对应 Python 解释器接收入站连接。</p>
+          <p>Tailscale：新增目标为此设备、端口为 tcp:服务端口的 grant，来源选择需要访问的账号或设备。规则不会代替本机服务监听和防火墙配置。</p>
+          <p id="networkPort"></p>
+        </details>
+        <details><summary>Python 进度与断点续跑</summary>
+          <p>自动发现当前项目目录内的 Python 脚本或 python -m 任务，不接管交互式控制台、内核或监控服务自身。可在任务详情中指定已有日志与结果目录。</p>
+          <p>Python 脚本可通过 research_progress.report(project, completed, total) 报告进度；保存结果后再传入 state="completed"。不能判断退出原因时记录为“退出状态未知”，不无限重启。重启重放原命令，是否从 checkpoint 继续由脚本实现。</p>
+          <p>内存达到任一保护阈值，会关闭所有自动续跑并取消待执行重启，不终止正在运行的计算。内存恢复后需逐任务重新开启。</p>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="deleteDialog">
+    <form id="deleteForm">
+      <h2>删除任务</h2><p id="deleteName"></p>
+      <p>仅删除监控记录，不删除日志、checkpoint 或结果文件。</p>
+      <label class="setting-check"><input id="deleteStop" type="checkbox">同时停止该任务的 MATLAB / Python 进程</label>
+      <div class="dialog-actions"><button id="deleteCancel" class="button secondary" type="button">取消</button><button class="button danger" type="submit">删除任务</button></div>
+      <p id="deleteError" role="alert"></p>
+    </form>
+  </dialog>
+  <div id="imageViewer" class="image-viewer" role="dialog" aria-modal="true" aria-label="结果图预览" hidden>
+    <button id="closeViewer" class="viewer-close" type="button" aria-label="关闭预览">×</button>
+    <img id="viewerImage" alt="">
+    <p id="viewerCaption"></p>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
