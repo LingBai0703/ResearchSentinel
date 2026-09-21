@@ -54,6 +54,11 @@ class TaskTests(unittest.TestCase):
         self.assertTrue(tasks[1]["auto_restart"])
         self.assertFalse(self.load().tasks[tasks[0]["id"]]["auto_restart"])
 
+    def test_python_tooling_modules_are_not_research_tasks(self):
+        for module in ("pip", "pytest", "unittest", "PyInstaller", "compileall"):
+            self.assertFalse(python_command([sys.executable, "-m", module]))
+        self.assertTrue(python_command([sys.executable, "-m", "my_experiment", "--run"]))
+
     def test_unobserved_exit_not_restarted(self):
         task = self.create()
         self.store.poll(rows={}, now=1020)

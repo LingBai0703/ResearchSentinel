@@ -36,6 +36,13 @@ def python_command(argv):
         return False
     if "-c" in argv or "-" in argv:
         return False
+    if "-m" in argv:
+        index = argv.index("-m")
+        module = argv[index + 1].lower() if index + 1 < len(argv) else ""
+        tooling = {"pip", "pytest", "unittest", "compileall", "pyinstaller", "venv",
+                   "ensurepip", "build", "twine", "http"}
+        if module.split(".", 1)[0] in tooling:
+            return False
     return any(arg.endswith(".py") for arg in argv[1:]) or "-m" in argv
 
 
