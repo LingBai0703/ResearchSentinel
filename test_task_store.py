@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from research_server import DEFAULT_SETTINGS, atomic_json_write, discover_results, snapshot_dict
+from monitor_core import JobInfo, MonitorSnapshot
 from service_settings import autostart_spec, validate_settings
 from task_store import TaskStore, identity, python_command
 
@@ -64,6 +65,24 @@ class TaskTests(unittest.TestCase):
         self.store.poll(rows={}, now=1020)
         self.assertEqual(task["status"], "EXITED")
         self.assertIsNone(task["next_restart"])
+
+    def test_unclean_service_restart_recovers_missing_active_task(self):
+        path = self.state / "tasks.json"
+        row = self.row()
+        saved = {"tasks": {"old": {
+            "id": "old", "kind": "python", "name": "experiment.py",
+            "argv": row["argv"], "cwd": str(self.root), "started": 1000,
+            "identities": [row["identity"]], "processes": [], "status": "RUNNING",
+            "ended": None, "auto_restart": True, "attempts": 0, "next_restart": None,
+            "events": [], "results": [], "log_path": "", "output_dir": "",
+            "last_seen": 1010, "job": self.store.snapshot_dict(MonitorSnapshot(1010, [], JobInfo(), "RUNNING", ""))["job"]
+        }}, "ignored": {}, "memory_latched": False, "clean_shutdown": False}
+        path.write_text(json.dumps(saved), encoding="utf-8")
+        store = self.load()
+        store.poll(rows={}, now=1020)
+        task = store.tasks["old"]
+        self.assertEqual(task["status"], "CRASHED")
+        self.assertTrue(any("异常中断" in event["message"] for event in task["events"]))
 
     def test_completed_record_survives_exit_and_reload(self):
         task = self.create()

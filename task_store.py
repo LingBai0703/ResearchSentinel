@@ -59,6 +59,11 @@ class TaskStore:
         self.tasks = saved.get("tasks", {})
         self.ignored = saved.get("ignored", {})
         self.memory_latched = saved.get("memory_latched", False)
+        # A clean service stop leaves this marker true. If the process was
+        # killed or the host restarted, active tasks must be reclassified when
+        # they are absent from the first post-startup process sample.
+        self.startup_after_unclean_shutdown = not bool(saved.get("clean_shutdown", False))
+        self.clean_shutdown = False
         self.memory = {}
         self.samples = {}
         self.children = {}
@@ -66,8 +71,13 @@ class TaskStore:
 
     def save(self):
         self.save_json(self.path, {"tasks": self.tasks, "ignored": self.ignored,
-                                  "memory_latched": self.memory_latched})
+                                  "memory_latched": self.memory_latched,
+                                  "clean_shutdown": self.clean_shutdown})
         self.last_save = time.time()
+
+    def mark_clean_shutdown(self):
+        self.clean_shutdown = True
+        self.save()
 
     def import_completed(self, snapshot, command):
         """One-time migration of a verified completed legacy MATLAB run."""
@@ -244,9 +254,13 @@ class TaskStore:
                     complete = task["job"]["progress"].get("complete") or code == 0
                     progress = task["job"]["progress"]
                     known_incomplete = (progress.get("total") is not None and progress.get("completed") is not None) or task.get("failure_reported")
-                    task["status"] = "COMPLETED" if complete else ("CRASHED" if known_incomplete or (code is not None and code != 0) else "EXITED")
+                    interrupted = self.startup_after_unclean_shutdown and not complete and code is None
+                    task["status"] = "COMPLETED" if complete else ("CRASHED" if interrupted or known_incomplete or (code is not None and code != 0) else "EXITED")
                     task["ended"] = now
-                    self.event(task, "进程已退出：" + task["status"])
+                    if interrupted:
+                        self.event(task, "监控服务异常中断期间进程消失，按未完成任务恢复")
+                    else:
+                        self.event(task, "进程已退出：" + task["status"])
             if task["status"] == "CRASHED" and task["auto_restart"] and not self.memory_latched:
                 if task["attempts"] < self.settings.get("max_restart_attempts", 5) and self.recoverable(task):
                     task["next_restart"] = task["next_restart"] or now + min(300, self.settings.get("restart_delay_seconds", 10) * 2**task["attempts"])
@@ -256,6 +270,8 @@ class TaskStore:
                 self.delete(task["id"], False)
         if now - self.last_save >= 5:
             self.save()
+        # Only the first sample after startup uses the unclean-shutdown rule.
+        self.startup_after_unclean_shutdown = False
 
     def update_progress(self, task, now):
         # Optional explicit progress protocol; never infer a Python exit as a crash.

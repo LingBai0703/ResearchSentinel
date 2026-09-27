@@ -279,7 +279,7 @@ class ResearchSupervisor:
         self.wake_event.set()
         self.thread.join(timeout=5)
         with self.lock:
-            self.tasks.save()
+            self.tasks.mark_clean_shutdown()
 
     def rescan(self) -> None:
         self.wake_event.set()
