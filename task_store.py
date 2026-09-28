@@ -46,6 +46,18 @@ def python_command(argv):
     return any(arg.endswith(".py") for arg in argv[1:]) or "-m" in argv
 
 
+def matlab_automation_command(argv):
+    """MATLAB COM automation has no project cwd or replayable batch command."""
+    flags = {str(arg).lower() for arg in argv[1:]}
+    return "/mlautomation" in flags and "-embedding" in flags
+
+
+def process_belongs_to_monitor(kind, argv, cwd, root):
+    if cwd and within(cwd, root):
+        return True
+    return kind == "matlab" and matlab_automation_command(argv)
+
+
 class TaskStore:
     def __init__(self, root, state_dir, settings, save_json, discover_results, snapshot_dict):
         self.root, self.state_dir, self.settings = Path(root), Path(state_dir), settings
@@ -155,7 +167,7 @@ class TaskStore:
                 cwd = info["cwd"] or ""
                 if kind == "python" and any(Path(a).name in {"research_server.py", "monitor_core.py"} for a in argv):
                     continue
-                if not cwd or not within(cwd, self.root):
+                if not process_belongs_to_monitor(kind, argv, cwd, self.root):
                     continue
                 key = identity(p.pid, info["create_time"])
                 sampler = self.samples.setdefault(key, p)
@@ -210,10 +222,11 @@ class TaskStore:
                 elif argv:
                     argv[0] = root["executable"]
                 task_id = uuid.uuid4().hex
-                task = {"id": task_id, "kind": root["kind"], "name": Path(argv[1]).name if root["kind"] == "python" and len(argv) > 1 else "MATLAB",
+                automation = root["kind"] == "matlab" and matlab_automation_command(argv)
+                task = {"id": task_id, "kind": root["kind"], "name": Path(argv[1]).name if root["kind"] == "python" and len(argv) > 1 else ("MATLAB Automation" if automation else "MATLAB"),
                         "argv": argv, "cwd": root["cwd"], "started": root["started"],
                         "identities": [], "processes": [], "status": "RUNNING", "ended": None,
-                        "auto_restart": not self.memory_latched, "attempts": 0, "next_restart": None,
+                        "auto_restart": not self.memory_latched and not automation, "attempts": 0, "next_restart": None,
                         "events": [], "results": [], "log_path": "", "output_dir": "",
                         "last_seen": now, "job": self.snapshot_dict(MonitorSnapshot(now, [], JobInfo(), "RUNNING", ""))["job"]}
                 self.tasks[task_id] = task

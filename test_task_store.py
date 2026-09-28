@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 from research_server import DEFAULT_SETTINGS, atomic_json_write, discover_results, snapshot_dict
 from monitor_core import JobInfo, MonitorSnapshot
 from service_settings import autostart_spec, validate_settings
-from task_store import TaskStore, identity, python_command
+from task_store import TaskStore, identity, matlab_automation_command, process_belongs_to_monitor, python_command
 
 
 class TaskTests(unittest.TestCase):
@@ -59,6 +59,12 @@ class TaskTests(unittest.TestCase):
         for module in ("pip", "pytest", "unittest", "PyInstaller", "compileall"):
             self.assertFalse(python_command([sys.executable, "-m", module]))
         self.assertTrue(python_command([sys.executable, "-m", "my_experiment", "--run"]))
+
+    def test_matlab_com_automation_is_visible_outside_project(self):
+        argv = [r"C:\MATLAB\bin\MATLAB.exe", "/MLAutomation", "-Embedding"]
+        self.assertTrue(matlab_automation_command(argv))
+        self.assertTrue(process_belongs_to_monitor("matlab", argv, r"C:\MATLAB\bin", self.root))
+        self.assertFalse(process_belongs_to_monitor("matlab", [argv[0]], r"C:\MATLAB\bin", self.root))
 
     def test_unobserved_exit_not_restarted(self):
         task = self.create()
